@@ -1,0 +1,63 @@
+FROM golang:latest
+#Default GOPATH --> /go/src
+WORKDIR $GOPATH/src/mypackage/myapp/
+COPY . .
+RUN go get . && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' -o web .
+#ENTRYPOINT ["$GOPATH/src/mypackage/myapp/web"]
+#Go programmed to listen on 5005 hence expose the port
+EXPOSE 5005
+CMD ["./web"]
+#Image Size = 823MB
+-------------------------------
+#docker build -t goapp . -f mygodocker
+------------------------------------
+# Test if working
+docker run --rm -it -p 5005:5005 goapp
+----------------------------------------------
+#Alpine --
+FROM golang:alpine
+#WORKDIR /go/src/mypackage/myapp/
+#RUN apk update && apk add --no-cache git
+WORKDIR $GOPATH/src/mypackage/myapp/
+COPY . .
+RUN go get . && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' -o web .
+#ENTRYPOINT ["$GOPATH/src/mypackage/myapp/web"]
+#Go programmed to listen on 5005 hence expose the port
+EXPOSE 5005
+CMD ["./web"]
+
+#Image Size = 415MB
+------------------------------------------------
+#Copy go app  to PWD
+#docker create -ti --name dummy goapp_alpine  bash
+#docker cp dummy:/go/src/mypackage/myapp/web .
+#docker rm -fv dummy
+#----------------------
+#---------------------------------
+#MINIMISE GO BUILD with multistage --
+#----------------------------------------------------
+FROM golang as builder
+#Default GOPATH --> /go/src
+WORKDIR /go/src/mypackage/myapp/
+COPY . .
+RUN go get . && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' -o web .
+FROM alpine
+COPY --from=builder /go/src/mypackage/myapp/web /app/
+WORKDIR /app
+CMD ["./web"]
+#Image Size = 13.8MB
+#------------------------------------------------
+#Minimize the entire runtime environment… build FROM scratch --
+#----------------------------------------------------
+FROM golang as builder
+#Default GOPATH --> /go/src
+WORKDIR /go/src/mypackage/myapp/
+COPY . .
+RUN go get . && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' -o web .
+FROM scratch
+COPY --from=builder /go/src/mypackage/myapp/web /app/
+COPY --from=builder /go/src/mypackage/myapp/index.html /app/
+WORKDIR /app
+CMD ["./web"]
+#Image Size = 8.26MB
+
